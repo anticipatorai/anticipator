@@ -25,7 +25,6 @@ OBJECTS = [
     "response", "responses", "request", "requests",
 ]
 
-# Add these directly to phrases in generate_phrases()
 DIRECT_PHRASES = [
     "ignore all previous instructions",
     "ignore all prior instructions",
