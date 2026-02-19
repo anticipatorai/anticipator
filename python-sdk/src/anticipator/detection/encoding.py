@@ -107,23 +107,3 @@ def detect(text: str) -> dict:
         "layer": "encoding_decoder"
     }
 
-
-# -------------------------
-# Test Harness
-# -------------------------
-
-if __name__ == "__main__":
-    tests = [
-    "sk-proj-abc123XYZ789secretkeyhere1234567890",
-    "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-    "Hello how are you today",
-    "AKIA1234567890ABCDEF",
-    "password=mysecretpassword123",
-]
-
-    for t in tests:
-        result = detect(t)
-        print(f"Input: {t[:50]}")
-        print(f"Detected: {result['detected']} | Severity: {result['severity']}")
-        print(f"Findings: {result['findings']}")
-        print()
