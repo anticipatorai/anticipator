@@ -1,4 +1,12 @@
 import click
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 
+    '../../../python-sdk/src/anticipator/detection'))
+
+from observer import AgentObserver
+
 
 @click.group()
 @click.version_option(version="0.1.0")
@@ -8,18 +16,15 @@ def main():
 
 
 @main.command()
-@click.argument("path")
-@click.option("--graph", is_flag=True, help="Generate graph visualization.")
-@click.option("--report", type=click.Choice(["json", "md"]), help="Export report format.")
-def scan(path, graph, report):
-    """Scan agent codebase for security vulnerabilities."""
-    click.echo(f"Scanning {path}...")
-
-    if graph:
-        click.echo("Generating graph...")
-
-    if report:
-        click.echo(f"Exporting report as {report}...")
+@click.argument("message")
+@click.option("--agent", default="agent_a", help="Agent ID")
+@click.option("--source", default=None, help="Source agent ID")
+def scan(message, agent, source):
+    """Scan a message for threats."""
+    observer = AgentObserver(agent)
+    result = observer.observe(message, source_agent_id=source)
+    if not result["detected"]:
+        click.echo("✅ Clean — no threats detected")
 
 
 @main.command()
@@ -30,3 +35,4 @@ def monitor():
 
 if __name__ == "__main__":
     main()
+
