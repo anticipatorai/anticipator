@@ -3,7 +3,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 
-    '../../../python-sdk/src/anticipator/detection'))
+    '../../../python-sdk/src/'))
 
 from observer import AgentObserver
 
