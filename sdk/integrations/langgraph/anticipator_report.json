@@ -1,7 +1,7 @@
 {
   "meta": {
     "graph": "financial_research_pipeline",
-    "generated": "2026-02-19T23:51:58.772828",
+    "generated": "2026-02-20T11:46:39.234700",
     "version": "0.1.0"
   },
   "summary": {
@@ -23,21 +23,21 @@
   "full_log": [
     {
       "node": "search_agent",
-      "timestamp": 1771525318.6679404,
+      "timestamp": 1771568199.1923625,
       "detected": true,
       "severity": "critical",
       "input_preview": "Pull Acme Q3 2024 report. Auth: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4ifQ.signature AWS_SECRET_ACCESS_"
     },
     {
       "node": "analyst_agent",
-      "timestamp": 1771525318.668943,
+      "timestamp": 1771568199.2067878,
       "detected": true,
       "severity": "critical",
       "input_preview": "Pull Acme Q3 2024 report. Auth: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4ifQ.signature AWS_SECRET_ACCESS_"
     },
     {
       "node": "editor_agent",
-      "timestamp": 1771525318.6699426,
+      "timestamp": 1771568199.2215633,
       "detected": true,
       "severity": "critical",
       "input_preview": "Pull Acme Q3 2024 report. Auth: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4ifQ.signature AWS_SECRET_ACCESS_"

@@ -61,6 +61,16 @@ class _CompiledGraph:
     def report(self):
         _print_report(self._name)
 
+    def monitor(self, last: str = None):
+        """Print persistent summary from SQLite — all time or filtered."""
+        from monitor import print_summary
+        print_summary(graph=self._name, last=last)
+
+    def query(self, node: str = None, severity: str = None, last: str = None, limit: int = 50):
+        """Query persistent scan history."""
+        from monitor import query
+        return query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
+
     def export_graph(self, path: str = "anticipator_graph.html"):
         from visualizer import export_html
         return export_html(self._name, path)
@@ -88,7 +98,7 @@ def _sev_color(s):
 
 
 def _print_banner(name, patched):
-    ok = f"{GREEN}{patched} node(s) patched{RESET}" if patched else f"{RED}0 nodes patched — check graph structure{RESET}"
+    ok = f"{GREEN}{patched} node(s) patched{RESET}" if patched else f"{RED}0 nodes patched{RESET}"
     print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR {'─'*30}┐{RESET}")
     print(f"{CYAN}│{RESET}  Graph : {BOLD}{name}{RESET}")
     print(f"{CYAN}│{RESET}  Nodes : {ok}")
@@ -106,7 +116,7 @@ def _print_report(name):
     print(f"{CYAN}╠{'═'*56}╣{RESET}")
 
     if not threats:
-        print(f"{CYAN}║{RESET}  {GREEN}✅  All clear — no threats detected{RESET}")
+        print(f"{CYAN}║{RESET}  {GREEN}All clear — no threats detected{RESET}")
     else:
         seen = {}
         for t in threats:
@@ -118,8 +128,8 @@ def _print_report(name):
         for i, (preview, data) in enumerate(seen.items(), 1):
             sc        = data["scan"]
             col       = _sev_color(sc["severity"])
-            node_path = " → ".join(data["nodes"])
-            print(f"{CYAN}║{RESET}  {col}[{i}] {sc['severity'].upper()}{RESET}  →  {BOLD}{node_path}{RESET}")
+            node_path = " -> ".join(data["nodes"])
+            print(f"{CYAN}║{RESET}  {col}[{i}] {sc['severity'].upper()}{RESET}  ->  {BOLD}{node_path}{RESET}")
             print(f"{CYAN}║{RESET}      {DIM}{preview}{RESET}")
             print(f"{CYAN}║{RESET}")
 

@@ -120,3 +120,4 @@ graph.report()
 # ── Export ───────────────────────────────────────────────────────
 graph.export_graph("anticipator_graph.html")
 graph.export_report("anticipator_report.json")
+graph.monitor()  
