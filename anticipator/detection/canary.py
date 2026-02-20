@@ -37,14 +37,3 @@ def detect(text: str, source_agent_id: str, current_agent_id: str) -> dict:
         "severity": "critical" if findings else "none",
         "layer": "canary_trap"
     }
-
-
-if __name__ == "__main__":
-    # Agent A sends message with canary
-    msg = inject_canary("Summarize this document", "agent_a")
-    print(f"Agent A message: {msg}")
-
-    # Agent B receives it — canary leak detected
-    result = detect(msg, "agent_a", "agent_b")
-    print(f"Detected: {result['detected']} | Severity: {result['severity']}")
-    print(f"Findings: {result['findings']}")

@@ -1,8 +1,7 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../src"))
-
-from interceptor import wrap_node, get_message_log, clear_message_log
+from anticipator.integrations.langgraph.interceptor import wrap_node, get_message_log
+from anticipator.integrations.visualizer import export_html
+from anticipator.integrations.exporter import export_json
+from anticipator.integrations.monitor import print_summary, query as db_query
 
 
 class ObservableGraph:
@@ -26,7 +25,6 @@ class ObservableGraph:
                     if not getattr(spec, "__wrapped_node__", False):
                         nodes[node_name] = wrap_node(node_name, spec, self._name)
                         patched += 1
-
         _print_banner(self._name, patched)
         self._patched = patched > 0
 
@@ -62,39 +60,28 @@ class _CompiledGraph:
         _print_report(self._name)
 
     def monitor(self, last: str = None):
-        """Print persistent summary from SQLite — all time or filtered."""
-        from monitor import print_summary
         print_summary(graph=self._name, last=last)
 
-    def query(self, node: str = None, severity: str = None, last: str = None, limit: int = 50):
-        """Query persistent scan history."""
-        from monitor import query
-        return query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
+    def query(self, node=None, severity=None, last=None, limit=50):
+        return db_query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
 
-    def export_graph(self, path: str = "anticipator_graph.html"):
-        from visualizer import export_html
-        return export_html(self._name, path)
+    def export_graph(self, path=None):
+        return export_html(log=get_message_log(), name=self._name, path=path)
 
-    def export_report(self, path: str = "anticipator_report.json"):
-        from exporter import export_json
-        return export_json(self._name, path)
+    def export_report(self, path=None):
+        return export_json(log=get_message_log(), name=self._name, path=path)
 
     def __getattr__(self, name):
         return getattr(self._compiled, name)
 
 
-# ── Terminal colors ──────────────────────────────────────────────
 RESET  = "\033[0m";  BOLD   = "\033[1m";  DIM    = "\033[2m"
 RED    = "\033[91m"; GREEN  = "\033[92m"; YELLOW = "\033[93m"
 CYAN   = "\033[96m"; WHITE  = "\033[97m"; BG_RED = "\033[41m"
 
 
 def _sev_color(s):
-    return {
-        "critical": f"{BG_RED}{WHITE}{BOLD}",
-        "warning":  f"{YELLOW}{BOLD}",
-        "none":     GREEN,
-    }.get(s, RESET)
+    return {"critical": f"{BG_RED}{WHITE}{BOLD}", "warning": f"{YELLOW}{BOLD}", "none": GREEN}.get(s, RESET)
 
 
 def _print_banner(name, patched):
@@ -108,13 +95,11 @@ def _print_banner(name, patched):
 def _print_report(name):
     log     = get_message_log()
     threats = [r for r in log if r["scan"]["detected"]]
-
     print(f"\n{CYAN}{BOLD}╔══ ANTICIPATOR REPORT {'═'*34}╗{RESET}")
     print(f"{CYAN}║{RESET}  Graph   : {BOLD}{name}{RESET}")
     print(f"{CYAN}║{RESET}  Scanned : {BOLD}{len(log)} messages{RESET}")
     print(f"{CYAN}║{RESET}  Threats : {(RED+BOLD) if threats else GREEN}{len(threats)}{RESET}")
     print(f"{CYAN}╠{'═'*56}╣{RESET}")
-
     if not threats:
         print(f"{CYAN}║{RESET}  {GREEN}All clear — no threats detected{RESET}")
     else:
@@ -124,13 +109,14 @@ def _print_report(name):
             if key not in seen:
                 seen[key] = {"nodes": [], "scan": t["scan"]}
             seen[key]["nodes"].append(t["node"])
-
         for i, (preview, data) in enumerate(seen.items(), 1):
-            sc        = data["scan"]
-            col       = _sev_color(sc["severity"])
+            col       = _sev_color(data["scan"]["severity"])
             node_path = " -> ".join(data["nodes"])
-            print(f"{CYAN}║{RESET}  {col}[{i}] {sc['severity'].upper()}{RESET}  ->  {BOLD}{node_path}{RESET}")
+            print(f"{CYAN}║{RESET}  {col}[{i}] {data['scan']['severity'].upper()}{RESET}  ->  {BOLD}{node_path}{RESET}")
             print(f"{CYAN}║{RESET}      {DIM}{preview}{RESET}")
             print(f"{CYAN}║{RESET}")
-
     print(f"{CYAN}╚{'═'*56}╝{RESET}\n")
+
+
+def observe(graph, name: str = "langgraph") -> ObservableGraph:
+    return ObservableGraph(graph, name)

@@ -1,4 +1,4 @@
-from wrapper import ObservableCrew
+from .wrapper import ObservableCrew
 
 
 def observe(crew, name: str = "crewai") -> ObservableCrew:

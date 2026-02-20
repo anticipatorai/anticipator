@@ -1,12 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "anticipator"
-version = "0.1.0"
+version = "0.1.4"
+description = "Runtime threat detection for multi-agent AI systems"
+readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.9"
-dependencies = ["click"]
+dependencies = [
+    "click>=8.0",
+    "pyahocorasick>=2.0",
+]
+
+[project.optional-dependencies]
+langgraph = ["langgraph>=1.0.0", "langchain>=1.0.0"]
+crewai = ["crewai>=1.0.0"]
+all = ["langgraph>=1.0.0", "langchain>=1.0.0", "crewai>=1.0.0"]
 
 [project.scripts]
-anticipator = "cli.src.cli:main"
+anticipator = "anticipator.cli:main"
 
-[build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["anticipator*"]

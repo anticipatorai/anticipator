@@ -1,6 +1,6 @@
 import ahocorasick
-from normalizer import normalize
-from signatures import VERBS, ADJECTIVES, PREPOSITIONS, OBJECTS, DIRECT_PHRASES
+from anticipator.detection.normalizer import normalize
+from anticipator.detection.signatures import VERBS, ADJECTIVES, PREPOSITIONS, OBJECTS, DIRECT_PHRASES
 
 def generate_phrases():
     phrases = [normalize(p) for p in DIRECT_PHRASES]
@@ -13,7 +13,6 @@ def generate_phrases():
                     phrases.append(phrase)
     return list(set(phrases))
 
-
 def build_automaton():
     A = ahocorasick.Automaton()
     for idx, phrase in enumerate(generate_phrases()):
@@ -21,9 +20,7 @@ def build_automaton():
     A.make_automaton()
     return A
 
-
 _AUTOMATON = build_automaton()
-
 
 def detect(text: str) -> dict:
     normalized = normalize(text)

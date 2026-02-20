@@ -1,9 +1,8 @@
-from aho import detect as aho_detect
-from encoding import detect as encoding_detect
-from entropy import detect as entropy_detect
-from heuristic import detect as heuristic_detect
-from canary import detect as canary_detect, inject_canary
-
+from anticipator.detection.aho import detect as aho_detect
+from anticipator.detection.encoding import detect as encoding_detect
+from anticipator.detection.entropy import detect as entropy_detect
+from anticipator.detection.heuristic import detect as heuristic_detect
+from anticipator.detection.canary import detect as canary_detect, inject_canary
 
 def scan(text: str, agent_id: str = "unknown", source_agent_id: str = None) -> dict:
     results = {

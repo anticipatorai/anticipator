@@ -2,19 +2,12 @@ import base64
 import re
 from urllib.parse import unquote
 from typing import Optional, List, Dict, Set
-
-import aho
-
+from . import aho
 
 MAX_DEPTH = 3
 
 HEX_PATTERN = re.compile(r'\b(?:[0-9a-fA-F]{2}){20,}\b')
 BASE64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){5,}(?:==|=)?')
-
-
-# -------------------------
-# Decoders
-# -------------------------
 
 def decode_base64(text: str) -> Optional[str]:
     try:
@@ -27,17 +20,11 @@ def decode_base64(text: str) -> Optional[str]:
     except Exception:
         return None
 
-
 def decode_hex(text: str) -> Optional[str]:
     try:
         return bytes.fromhex(text).decode("utf-8")
     except Exception:
         return None
-
-
-# -------------------------
-# Recursive Scanner
-# -------------------------
 
 def recursive_scan(text: str,
                    depth: int = 0,
@@ -52,7 +39,6 @@ def recursive_scan(text: str,
     seen_texts.add(text)
     findings = []
 
-    # Direct Aho detection
     result = aho.detect(text)
     if result["detected"]:
         findings.append({
@@ -61,7 +47,6 @@ def recursive_scan(text: str,
             "aho_matches": result["matches"]
         })
 
-    # HEX decoding
     for candidate in HEX_PATTERN.findall(text):
         decoded = decode_hex(candidate)
         if decoded and decoded not in seen_texts:
@@ -71,7 +56,6 @@ def recursive_scan(text: str,
             })
             findings += recursive_scan(decoded, depth + 1, seen_texts)
 
-    # BASE64 decoding
     for candidate in BASE64_PATTERN.findall(text):
         decoded = decode_base64(candidate)
         if decoded and decoded not in seen_texts:
@@ -81,7 +65,6 @@ def recursive_scan(text: str,
             })
             findings += recursive_scan(decoded, depth + 1, seen_texts)
 
-    # URL decoding
     url_decoded = unquote(text)
     if url_decoded != text and url_decoded not in seen_texts:
         findings.append({
@@ -91,11 +74,6 @@ def recursive_scan(text: str,
         findings += recursive_scan(url_decoded, depth + 1, seen_texts)
 
     return findings
-
-
-# -------------------------
-# Public API
-# -------------------------
 
 def detect(text: str) -> dict:
     findings = recursive_scan(text)

@@ -1,19 +1,7 @@
-"""
-CrewAI ObservableCrew wrapper.
-Wraps before kickoff() — same pattern as LangGraph.
-
-Usage:
-    from integrations.crewai import observe
-
-    crew   = Crew(agents=[...], tasks=[...])
-    secure = observe(crew, name="my_pipeline")
-    result = secure.kickoff()
-"""
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../src"))
-
-from interceptor import wrap_agent, get_message_log, clear_message_log
+from anticipator.integrations.crewai.interceptor import wrap_agent, get_message_log
+from anticipator.integrations.visualizer import export_html
+from anticipator.integrations.exporter import export_json
+from anticipator.integrations.monitor import print_summary, query as db_query
 
 
 class ObservableCrew:
@@ -31,14 +19,10 @@ class ObservableCrew:
         _print_banner(self._name, patched)
 
     def kickoff(self, inputs=None):
-        if inputs is not None:
-            return self._crew.kickoff(inputs=inputs)
-        return self._crew.kickoff()
+        return self._crew.kickoff(inputs=inputs) if inputs else self._crew.kickoff()
 
     async def kickoff_async(self, inputs=None):
-        if inputs is not None:
-            return await self._crew.kickoff_async(inputs=inputs)
-        return await self._crew.kickoff_async()
+        return await (self._crew.kickoff_async(inputs=inputs) if inputs else self._crew.kickoff_async())
 
     def get_log(self):
         return get_message_log()
@@ -50,26 +34,21 @@ class ObservableCrew:
         _print_report(self._name)
 
     def monitor(self, last=None):
-        from monitor import print_summary
         print_summary(graph=self._name, last=last)
 
     def query(self, node=None, severity=None, last=None, limit=50):
-        from monitor import query
-        return query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
+        return db_query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
 
-    def export_graph(self, path="anticipator_crewai.html"):
-        from visualizer import export_html
-        return export_html(self._name, path)
+    def export_graph(self, path=None):
+        return export_html(log=get_message_log(), name=self._name, path=path)
 
-    def export_report(self, path="anticipator_crewai.json"):
-        from exporter import export_json
-        return export_json(self._name, path)
+    def export_report(self, path=None):
+        return export_json(log=get_message_log(), name=self._name, path=path)
 
     def __getattr__(self, name):
         return getattr(self._crew, name)
 
 
-# ── Colors ───────────────────────────────────────────────────────
 RESET  = "\033[0m"; BOLD = "\033[1m"; DIM = "\033[2m"
 RED    = "\033[91m"; GREEN = "\033[92m"; YELLOW = "\033[93m"
 CYAN   = "\033[96m"; WHITE = "\033[97m"; BG_RED = "\033[41m"
@@ -90,13 +69,11 @@ def _print_banner(name, patched):
 def _print_report(name):
     log     = get_message_log()
     threats = [r for r in log if r["scan"]["detected"]]
-
     print(f"\n{CYAN}{BOLD}╔══ ANTICIPATOR REPORT (CrewAI) {'═'*25}╗{RESET}")
     print(f"{CYAN}║{RESET}  Crew    : {BOLD}{name}{RESET}")
     print(f"{CYAN}║{RESET}  Scanned : {BOLD}{len(log)} messages{RESET}")
     print(f"{CYAN}║{RESET}  Threats : {(RED+BOLD) if threats else GREEN}{len(threats)}{RESET}")
     print(f"{CYAN}╠{'═'*56}╣{RESET}")
-
     if not threats:
         print(f"{CYAN}║{RESET}  {GREEN}All clear — no threats detected{RESET}")
     else:
@@ -112,5 +89,8 @@ def _print_report(name):
             print(f"{CYAN}║{RESET}  {col}[{i}] {data['scan']['severity'].upper()}{RESET}  ->  {BOLD}{node_path}{RESET}")
             print(f"{CYAN}║{RESET}      {DIM}{preview}{RESET}")
             print(f"{CYAN}║{RESET}")
-
     print(f"{CYAN}╚{'═'*56}╝{RESET}\n")
+
+
+def observe(crew, name: str = "crewai") -> ObservableCrew:
+    return ObservableCrew(crew, name)

@@ -1,18 +1,13 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../src"))
-
 import time
 from typing import Callable, Any
-from scanner import scan
-from monitor import write_scan, write_delegation
+from anticipator.integrations.monitor import write_scan, write_delegation
+from anticipator.detection.scanner import scan
 
 _message_log = []
-_last_node   = {}   # graph -> last node (for delegation tracking)
+_last_node   = {}  
 
 def get_message_log():   return _message_log
 def clear_message_log(): _message_log.clear()
-
 
 def _extract_text(state: Any) -> str:
     if isinstance(state, str):
@@ -36,26 +31,21 @@ def _extract_text(state: Any) -> str:
         return _extract_text(vars(state))
     return str(state)
 
-
 RESET  = "\033[0m"; BOLD   = "\033[1m"
 RED    = "\033[91m"; YELLOW = "\033[93m"
 CYAN   = "\033[96m"; WHITE  = "\033[97m"; BG_RED = "\033[41m"
-
 
 def wrap_node(node_name: str, fn: Callable, graph_name: str = "unknown") -> Callable:
     def intercepted(state: Any) -> Any:
         text = _extract_text(state)
 
-        # Track delegation: who handed off to this node
         prev = _last_node.get(graph_name)
         if prev and prev != node_name:
             write_delegation(graph_name, prev, node_name)
         _last_node[graph_name] = node_name
 
-        # Scan
         scan_result = scan(text=text, agent_id=node_name, source_agent_id=graph_name)
 
-        # In-memory log (for current session report)
         _message_log.append({
             "timestamp":     time.time(),
             "graph":         graph_name,

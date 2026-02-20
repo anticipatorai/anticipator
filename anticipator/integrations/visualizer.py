@@ -1,10 +1,12 @@
-from interceptor import get_message_log
-from datetime import datetime
+import os
 import json
+from datetime import datetime
 
 
-def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
-    log            = get_message_log()
+def export_html(log: list, name: str = "graph", path: str = None):
+    if path is None:
+        path = os.path.join(os.getcwd(), "anticipator_graph.html")
+
     threats        = {r["node"] for r in log if r["scan"]["detected"]}
     threat_records = [r for r in log if r["scan"]["detected"]]
     critical_count = len([r for r in log if r["scan"]["severity"] == "critical"])
@@ -59,7 +61,6 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
         for a, b in edges
     ])
 
-    # Incident rows
     incident_rows = ""
     for r in threat_records[-8:]:
         sev = r["scan"]["severity"]
@@ -77,8 +78,8 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
             "</tr>"
         )
 
-    sev_data   = json.dumps([critical_count, warning_count, clean_count])
-    node_names = json.dumps([n.replace("_", " ") for n in nodes])
+    sev_data    = json.dumps([critical_count, warning_count, clean_count])
+    node_names  = json.dumps([n.replace("_", " ") for n in nodes])
     node_counts = json.dumps([len([r for r in log if r["node"] == n and r["scan"]["detected"]]) for n in nodes])
     node_colors = json.dumps(["#ef4444" if n in threats else "#22c55e" for n in nodes])
 
@@ -102,8 +103,6 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
     background-image: radial-gradient(ellipse at 60% 40%, rgba(127,29,29,0.18) 0%, transparent 60%),
                       radial-gradient(ellipse at 20% 80%, rgba(99,102,241,0.08) 0%, transparent 50%);
   }
-
-  /* Top bar */
   .topbar {
     height: 58px;
     background: rgba(15,20,35,0.95);
@@ -136,15 +135,9 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
   }
   .status-label { font-size: 11px; color: #22c55e; margin-left: 6px; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  /* Layout */
-  .layout { display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; height: calc(100vh - 58px); gap: 1px; background: rgba(255,255,255,0.04); }
-
-  /* Panels */
+  .layout { display: grid; grid-template-columns: 1fr 380px; height: calc(100vh - 58px); gap: 1px; background: rgba(255,255,255,0.04); }
   .panel { background: #0d1220; padding: 20px 24px; overflow: hidden; display: flex; flex-direction: column; gap: 16px; }
   .panel-right { background: #0a0f1c; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-
-  /* Stat bubbles */
   .bubbles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .bubble {
     background: rgba(255,255,255,0.03);
@@ -153,7 +146,6 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
     padding: 18px 16px;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.2s;
   }
   .bubble::before {
     content: '';
@@ -163,11 +155,10 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
     border-radius: 50%;
     opacity: 0.12;
   }
-  .bubble.red::before   { background: #ef4444; }
-  .bubble.yellow::before{ background: #f59e0b; }
-  .bubble.green::before { background: #22c55e; }
-  .bubble.indigo::before{ background: #6366f1; }
-  .bubble:hover { border-color: rgba(255,255,255,0.12); }
+  .bubble.red::before    { background: #ef4444; }
+  .bubble.yellow::before { background: #f59e0b; }
+  .bubble.green::before  { background: #22c55e; }
+  .bubble.indigo::before { background: #6366f1; }
   .bubble .num  { font-size: 36px; font-weight: 700; line-height: 1; font-family: 'Space Mono', monospace; }
   .bubble.red    .num { color: #f87171; }
   .bubble.yellow .num { color: #fbbf24; }
@@ -175,21 +166,12 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
   .bubble.indigo .num { color: #818cf8; }
   .bubble .lbl { font-size: 11px; color: #475569; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
   .bubble .sub { font-size: 10px; color: #334155; margin-top: 3px; }
-
-  /* Agent graph */
   .graph-container { flex: 1; border-radius: 12px; overflow: hidden; background: #080b14; position: relative; border: 1px solid rgba(255,255,255,0.05); }
   #graph { width: 100%; height: 100%; }
   .graph-label { position: absolute; top: 12px; left: 16px; font-size: 11px; color: #334155; text-transform: uppercase; letter-spacing: 1px; z-index: 10; font-family: 'Space Mono', monospace; }
-
-  /* Section headers */
-  .sec-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
-
-  /* Charts */
   .chart-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; }
   .chart-box .chart-title { font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 12px; }
   .chart-wrap { height: 130px; position: relative; }
-
-  /* Incident table */
   .incident-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; }
   .incident-header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; }
   .incident-count { background: #7f1d1d; color: #fca5a5; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
@@ -201,7 +183,6 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
 </style>
 </head>
 <body>
-
 <div class="topbar">
   <div class="logo">Antici<span>p</span>ator</div>
   <div class="logo-sub">MULTI-AGENT RUNTIME SECURITY</div>
@@ -209,13 +190,8 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
   <div class="status-dot"></div>
   <div class="status-label">Live</div>
 </div>
-
 <div class="layout">
-
-  <!-- Left: main panel -->
   <div class="panel">
-
-    <!-- Stat bubbles -->
     <div class="bubbles">
       <div class="bubble indigo">
         <div class="num">""" + str(len(log)) + """</div>
@@ -238,14 +214,10 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
         <div class="sub">no threats found</div>
       </div>
     </div>
-
-    <!-- Agent graph -->
     <div class="graph-container">
       <div class="graph-label">Agent Pipeline Topology</div>
       <div id="graph"></div>
     </div>
-
-    <!-- Incident log -->
     <div class="incident-box">
       <div class="incident-header">
         Incident Log
@@ -257,39 +229,29 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
         '<div class="empty">No threats detected this session</div>'
       ) + """
     </div>
-
   </div>
-
-  <!-- Right: charts -->
   <div class="panel-right">
-
     <div class="chart-box">
       <div class="chart-title">Severity Breakdown</div>
-      <div class="chart-wrap">
-        <canvas id="donutChart"></canvas>
-      </div>
+      <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
     </div>
-
     <div class="chart-box">
       <div class="chart-title">Threats per Agent</div>
-      <div class="chart-wrap">
-        <canvas id="barChart"></canvas>
-      </div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
     </div>
-
     <div class="chart-box" style="flex:1">
       <div class="chart-title">Legend</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
         <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#94a3b8">
-          <div style="width:12px;height:12px;border-radius:3px;background:#7f1d1d;border:1.5px solid #ef4444;box-shadow:0 0 8px rgba(239,68,68,0.4)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:#7f1d1d;border:1.5px solid #ef4444"></div>
           Threat detected node
         </div>
         <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#94a3b8">
-          <div style="width:12px;height:12px;border-radius:3px;background:#1e3a2f;border:1.5px solid #22c55e;box-shadow:0 0 8px rgba(34,197,94,0.3)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:#1e3a2f;border:1.5px solid #22c55e"></div>
           Clean node
         </div>
         <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#94a3b8">
-          <div style="width:24px;height:2px;background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,0.4)"></div>
+          <div style="width:24px;height:2px;background:#ef4444"></div>
           Threat propagation path
         </div>
         <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#94a3b8">
@@ -298,13 +260,9 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
         </div>
       </div>
     </div>
-
   </div>
-
 </div>
-
 <script>
-  // Donut
   new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
     data: {
@@ -320,37 +278,25 @@ def export_html(name: str = "graph", path: str = "anticipator_graph.html"):
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '70%',
       plugins: {
-        legend: {
-          position: 'right',
-          labels: { color: '#64748b', font: { family: 'Space Grotesk', size: 11 }, padding: 12, boxWidth: 10, borderRadius: 3 }
-        }
+        legend: { position: 'right', labels: { color: '#64748b', font: { family: 'Space Grotesk', size: 11 }, padding: 12, boxWidth: 10 } }
       }
     }
   });
-
-  // Bar
   new Chart(document.getElementById('barChart'), {
     type: 'bar',
     data: {
       labels: """ + node_names + """,
-      datasets: [{
-        data: """ + node_counts + """,
-        backgroundColor: """ + node_colors + """,
-        borderRadius: 6,
-        borderSkipped: false,
-      }]
+      datasets: [{ data: """ + node_counts + """, backgroundColor: """ + node_colors + """, borderRadius: 6, borderSkipped: false }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#475569', font: { family: 'Space Grotesk', size: 10 } }, border: { display: false } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { family: 'Space Grotesk', size: 10 }, stepSize: 1 }, beginAtZero: true, border: { display: false } }
+        x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 10 } }, border: { display: false } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, stepSize: 1 }, beginAtZero: true, border: { display: false } }
       }
     }
   });
-
-  // Agent graph
   var visNodes = new vis.DataSet([""" + nodes_js + """]);
   var visEdges = new vis.DataSet([""" + edges_js + """]);
   new vis.Network(document.getElementById('graph'), { nodes: visNodes, edges: visEdges }, {

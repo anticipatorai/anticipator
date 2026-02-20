@@ -1,11 +1,10 @@
 import re
 import math
 from typing import List
-from signatures import CREDENTIAL_PATTERNS
+from .signatures import CREDENTIAL_PATTERNS
 
 ENTROPY_THRESHOLD = 4.2
 LENGTH_THRESHOLD = 20
-
 
 def shannon_entropy(text: str) -> float:
     if not text:
@@ -18,7 +17,6 @@ def shannon_entropy(text: str) -> float:
         prob = count / len(text)
         entropy -= prob * math.log2(prob)
     return entropy
-
 
 def find_high_entropy_strings(text: str) -> List[dict]:
     findings = []
@@ -34,7 +32,6 @@ def find_high_entropy_strings(text: str) -> List[dict]:
             })
     return findings
 
-
 def find_credential_patterns(text: str) -> List[dict]:
     findings = []
     for pattern, label in CREDENTIAL_PATTERNS:
@@ -45,7 +42,6 @@ def find_credential_patterns(text: str) -> List[dict]:
                 "severity": "critical"
             })
     return findings
-
 
 def detect(text: str) -> dict:
     entropy_findings = find_high_entropy_strings(text)

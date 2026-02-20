@@ -1,4 +1,4 @@
-from wrapper import ObservableGraph
+from .wrapper import ObservableGraph
 
 
 def observe(graph, name: str = "langgraph") -> ObservableGraph:
