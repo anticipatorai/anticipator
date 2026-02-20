@@ -41,7 +41,7 @@ def wrap_node(node_name: str, fn: Callable, graph_name: str = "unknown") -> Call
 
         prev = _last_node.get(graph_name)
         if prev and prev != node_name:
-            write_delegation(graph_name, prev, node_name)
+            write_delegation("langgraph", graph_name, prev, node_name)
         _last_node[graph_name] = node_name
 
         scan_result = scan(text=text, agent_id=node_name, source_agent_id=graph_name)
@@ -55,8 +55,7 @@ def wrap_node(node_name: str, fn: Callable, graph_name: str = "unknown") -> Call
         })
 
         # Persistent log (survives restarts)
-        write_scan(graph_name, node_name, scan_result, text)
-
+        write_scan("langgraph", graph_name, node_name, scan_result, text)
         # Alert
         if scan_result["detected"]:
             sev = scan_result["severity"]

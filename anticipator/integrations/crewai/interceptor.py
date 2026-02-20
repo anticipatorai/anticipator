@@ -66,7 +66,7 @@ def wrap_agent(agent, graph_name: str = "crewai") -> None:
         # Delegation tracking
         prev = _last_agent.get(graph_name)
         if prev and prev != agent_name:
-            write_delegation(graph_name, prev, agent_name)
+            write_delegation("crewai", graph_name, prev, agent_name)
 
         _last_agent[graph_name] = agent_name
 
@@ -87,7 +87,8 @@ def wrap_agent(agent, graph_name: str = "crewai") -> None:
         })
 
         # Persistent log
-        write_scan(graph_name, agent_name, scan_result, text)
+        write_scan("crewai", graph_name, agent_name, scan_result, text)
+        
 
         # Alert
         if scan_result.get("detected"):
@@ -103,3 +104,5 @@ def wrap_agent(agent, graph_name: str = "crewai") -> None:
 
     patched_execute.__wrapped_anticipator__ = True
     object.__setattr__(agent, "execute_task", patched_execute)
+
+    
