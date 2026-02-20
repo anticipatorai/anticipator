@@ -117,6 +117,13 @@ def _print_report(name):
             print(f"{CYAN}║{RESET}")
     print(f"{CYAN}╚{'═'*56}╝{RESET}\n")
 
+def compile(self, **kwargs):
+    # If already compiled, return as-is wrapped
+    if hasattr(self._graph, 'invoke') and not hasattr(self._graph, 'compile'):
+        return _CompiledGraph(self._graph, self._name)
+    compiled = self._graph.compile(**kwargs)
+    return _CompiledGraph(compiled, self._name)
+
 
 def observe(graph, name: str = "langgraph") -> ObservableGraph:
     return ObservableGraph(graph, name)
