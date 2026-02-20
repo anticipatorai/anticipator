@@ -19,19 +19,19 @@ Anticipator wraps your existing agent graph and intercepts every message in tran
 ## Installation
 
 ```bash
-pip install anticipator-ai
+pip install anticipator
 ```
 
 With LangGraph:
 
 ```bash
-pip install anticipator-ai[langgraph]
+pip install anticipator[langgraph]
 ```
 
 With CrewAI:
 
 ```bash
-pip install anticipator-ai[crewai]
+pip install anticipator[crewai]
 ```
 
 ---
