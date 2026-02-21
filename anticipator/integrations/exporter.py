@@ -27,7 +27,7 @@ def export_json(log: list = None, name: str = "graph", path: str = None, source:
 
     grouped = {}
     for t in threats:
-        key = t["input_preview"][:80]
+        key = t["input_preview"][:300]
         if key not in grouped:
             grouped[key] = {"nodes": [], "severity": t["scan"]["severity"], "preview": key}
         grouped[key]["nodes"].append(t["node"])

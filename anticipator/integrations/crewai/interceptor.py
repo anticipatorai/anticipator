@@ -82,7 +82,7 @@ def wrap_agent(agent, graph_name: str = "crewai") -> None:
             "timestamp": time.time(),
             "graph": graph_name,
             "node": agent_name,
-            "input_preview": text[:120],
+            "input_preview": text[:1000],
             "scan": scan_result,
         })
 
@@ -94,8 +94,6 @@ def wrap_agent(agent, graph_name: str = "crewai") -> None:
         if scan_result.get("detected"):
             sev = scan_result.get("severity", "low")
             col = f"{BG_RED}{WHITE}{BOLD}" if sev == "critical" else f"{YELLOW}{BOLD}"
-            print(f"{CYAN}[ANTICIPATOR]{RESET} {col}⚠ {sev.upper()}{RESET} at agent {BOLD}{agent_name!r}{RESET}")
-            print(f"  {text[:200]}\n")
 
         # Continue normal execution
         if tools is not None:

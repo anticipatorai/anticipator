@@ -50,7 +50,7 @@ def wrap_node(node_name: str, fn: Callable, graph_name: str = "unknown") -> Call
             "timestamp":     time.time(),
             "graph":         graph_name,
             "node":          node_name,
-            "input_preview": text[:120],
+            "input_preview": text[:1000],
             "scan":          scan_result,
         })
 
@@ -60,8 +60,6 @@ def wrap_node(node_name: str, fn: Callable, graph_name: str = "unknown") -> Call
         if scan_result["detected"]:
             sev = scan_result["severity"]
             col = f"{BG_RED}{WHITE}{BOLD}" if sev == "critical" else f"{YELLOW}{BOLD}"
-            print(f"{CYAN}[ANTICIPATOR]{RESET} {col}⚠  {sev.upper()}{RESET} at node {BOLD}{node_name!r}{RESET}")
-            print(f"  {text[:200]}\n")
 
         return fn(state)
 

@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "../../database/anticipator.db")
+DB_PATH = os.path.join(os.path.expanduser("~"), ".anticipator", "anticipator.db")
 
 def _connect() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) 

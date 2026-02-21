@@ -1,5 +1,5 @@
+import threading
 from anticipator.integrations.langgraph.interceptor import wrap_node, get_message_log
-from anticipator.integrations.visualizer import export_html
 from anticipator.integrations.exporter import export_json
 from anticipator.integrations.monitor import print_summary, query as db_query
 
@@ -8,7 +8,9 @@ class ObservableGraph:
     def __init__(self, graph, name: str = "langgraph"):
         self._graph = graph
         self._name  = name
-        self._patch_nodes()
+        self._patch_done = threading.Event()
+        _print_banner_loading(self._name)
+        threading.Thread(target=self._patch_nodes, daemon=True).start()
 
     def _patch_nodes(self):
         patched = 0
@@ -25,10 +27,12 @@ class ObservableGraph:
                     if not getattr(spec, "__wrapped_node__", False):
                         nodes[node_name] = wrap_node(node_name, spec, self._name)
                         patched += 1
-        _print_banner(self._name, patched)
+        _update_banner(self._name, patched)
         self._patched = patched > 0
+        self._patch_done.set()
 
     def compile(self, **kwargs):
+        self._patch_done.wait()  # ensure patching done before compile
         compiled = self._graph.compile(**kwargs)
         return _CompiledGraph(compiled, self._name)
 
@@ -65,9 +69,6 @@ class _CompiledGraph:
     def query(self, node=None, severity=None, last=None, limit=50):
         return db_query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
 
-    def export_graph(self, path=None):
-        return export_html(log=get_message_log(), name=self._name, path=path)
-
     def export_report(self, path=None):
         return export_json(log=get_message_log(), name=self._name, path=path)
 
@@ -84,8 +85,17 @@ def _sev_color(s):
     return {"critical": f"{BG_RED}{WHITE}{BOLD}", "warning": f"{YELLOW}{BOLD}", "none": GREEN}.get(s, RESET)
 
 
-def _print_banner(name, patched):
+def _print_banner_loading(name):
+    print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR {'─'*30}┐{RESET}")
+    print(f"{CYAN}│{RESET}  Graph : {BOLD}{name}{RESET}")
+    print(f"{CYAN}│{RESET}  Nodes : {DIM}patching...{RESET}")
+    print(f"{CYAN}└{'─'*46}┘{RESET}\n")
+
+
+def _update_banner(name, patched):
     ok = f"{GREEN}{patched} node(s) patched{RESET}" if patched else f"{RED}0 nodes patched{RESET}"
+    # Move cursor up 4 lines and redraw
+    print(f"\033[4A\033[J", end="")
     print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR {'─'*30}┐{RESET}")
     print(f"{CYAN}│{RESET}  Graph : {BOLD}{name}{RESET}")
     print(f"{CYAN}│{RESET}  Nodes : {ok}")
@@ -116,13 +126,6 @@ def _print_report(name):
             print(f"{CYAN}║{RESET}      {DIM}{preview}{RESET}")
             print(f"{CYAN}║{RESET}")
     print(f"{CYAN}╚{'═'*56}╝{RESET}\n")
-
-def compile(self, **kwargs):
-    # If already compiled, return as-is wrapped
-    if hasattr(self._graph, 'invoke') and not hasattr(self._graph, 'compile'):
-        return _CompiledGraph(self._graph, self._name)
-    compiled = self._graph.compile(**kwargs)
-    return _CompiledGraph(compiled, self._name)
 
 
 def observe(graph, name: str = "langgraph") -> ObservableGraph:

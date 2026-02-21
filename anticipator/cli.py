@@ -2,7 +2,6 @@ import os
 import click
 from anticipator.detection.scanner import scan as run_scan
 from anticipator.integrations.exporter import export_json
-from anticipator.integrations.visualizer import export_html
 from anticipator.integrations.monitor import print_summary
 
 EXPORT_PATH = os.getenv("ANTICIPATOR_EXPORTS", "exports")
@@ -10,7 +9,7 @@ os.makedirs(EXPORT_PATH, exist_ok=True)
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="0.1.7")
 def main():
     """Anticipator — Runtime threat detection for multi-agent AI systems."""
     pass
@@ -23,7 +22,6 @@ def main():
 def scan(message, agent, source):
     """Scan a message for threats."""
     result = run_scan(text=message, agent_id=agent, source_agent_id=source)
-
     if result["detected"]:
         sev = result["severity"]
         col = "red" if sev == "critical" else "yellow"
@@ -43,11 +41,11 @@ def monitor(graph, last):
 
 
 @main.command()
-def export():
-    """Export reports."""
-    export_json(source="both")
-    export_html(log=[])
-    click.echo("✅ Reports generated.")
+@click.option("--output", default=None, help="Output path for JSON file")
+def export(output):
+    """Export JSON threat report."""
+    export_json(source="both", path=output)
+    click.echo("✅ JSON report generated.")
 
 
 if __name__ == "__main__":

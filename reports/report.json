@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "graph": "graph",
+    "generated": "2026-02-21T13:58:38.997737",
+    "version": "0.1.0",
+    "source": "both"
+  },
+  "summary": {
+    "total_scanned": 0,
+    "total_threats": 0,
+    "clean": 0
+  },
+  "threats": [],
+  "full_log": []
+}

@@ -1,5 +1,5 @@
+import threading
 from anticipator.integrations.crewai.interceptor import wrap_agent, get_message_log
-from anticipator.integrations.visualizer import export_html
 from anticipator.integrations.exporter import export_json
 from anticipator.integrations.monitor import print_summary, query as db_query
 
@@ -8,7 +8,9 @@ class ObservableCrew:
     def __init__(self, crew, name: str = "crewai"):
         self._crew = crew
         self._name = name
-        self._patch_agents()
+        self._patch_done = threading.Event()
+        _print_banner_loading(self._name)
+        threading.Thread(target=self._patch_agents, daemon=True).start()
 
     def _patch_agents(self):
         agents  = getattr(self._crew, "agents", [])
@@ -16,12 +18,16 @@ class ObservableCrew:
         for agent in agents:
             wrap_agent(agent, self._name)
             patched += 1
-        _print_banner(self._name, patched)
+        _update_banner(self._name, patched)
+        self._patched = patched > 0
+        self._patch_done.set()
 
     def kickoff(self, inputs=None):
+        self._patch_done.wait()
         return self._crew.kickoff(inputs=inputs) if inputs else self._crew.kickoff()
 
     async def kickoff_async(self, inputs=None):
+        self._patch_done.wait()
         return await (self._crew.kickoff_async(inputs=inputs) if inputs else self._crew.kickoff_async())
 
     def get_log(self):
@@ -39,9 +45,6 @@ class ObservableCrew:
     def query(self, node=None, severity=None, last=None, limit=50):
         return db_query(graph=self._name, node=node, severity=severity, last=last, limit=limit)
 
-    def export_graph(self, path=None):
-        return export_html(log=get_message_log(), name=self._name, path=path)
-
     def export_report(self, path=None):
         return export_json(log=get_message_log(), name=self._name, path=path)
 
@@ -58,8 +61,16 @@ def _sev_color(s):
     return {"critical": f"{BG_RED}{WHITE}{BOLD}", "warning": f"{YELLOW}{BOLD}", "none": GREEN}.get(s, RESET)
 
 
-def _print_banner(name, patched):
+def _print_banner_loading(name):
+    print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR (CrewAI) {'─'*24}┐{RESET}")
+    print(f"{CYAN}│{RESET}  Crew   : {BOLD}{name}{RESET}")
+    print(f"{CYAN}│{RESET}  Agents : {DIM}patching...{RESET}")
+    print(f"{CYAN}└{'─'*46}┘{RESET}\n")
+
+
+def _update_banner(name, patched):
     ok = f"{GREEN}{patched} agent(s) patched{RESET}" if patched else f"{RED}0 agents patched{RESET}"
+    print(f"\033[4A\033[J", end="")
     print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR (CrewAI) {'─'*24}┐{RESET}")
     print(f"{CYAN}│{RESET}  Crew   : {BOLD}{name}{RESET}")
     print(f"{CYAN}│{RESET}  Agents : {ok}")
