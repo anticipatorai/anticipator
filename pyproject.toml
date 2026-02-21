@@ -14,6 +14,8 @@ dependencies = [
     "pyahocorasick>=2.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest", "twine", "build"]
 
 [project.scripts]
 anticipator = "anticipator.cli:main"
