@@ -5,7 +5,7 @@ Thanks for your interest in contributing. Here's how to get started.
 ## Getting Started
 
 ```bash
-git clone https://github.com/yourusername/anticipator
+git clone https://github.com/anticipatorai/anticipator
 cd anticipator
 pip install -e ".[dev]"
 ```
