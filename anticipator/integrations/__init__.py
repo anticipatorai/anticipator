@@ -1,10 +1,6 @@
-def observe(graph_or_crew, name="anticipator"):
+def observe(graph, name="anticipator"):
     try:
-        from crewai import Crew
-        if isinstance(graph_or_crew, Crew):
-            from anticipator.integrations.crewai.wrapper import observe as crewai_observe
-            return crewai_observe(graph_or_crew, name)
-    except ImportError:
-        pass
-    from anticipator.integrations.langgraph.wrapper import observe as lg_observe
-    return lg_observe(graph_or_crew, name)
+        from anticipator.integrations.langgraph.wrapper import observe as lg_observe
+        return lg_observe(graph, name)
+    except ImportError as e:
+        raise ImportError(f"LangGraph integration not available: {e}")

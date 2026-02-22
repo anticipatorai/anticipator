@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 
-def export_json(log: list = None, name: str = "graph", path: str = None, source: str = "both"):
+def export_json(log: list = None, name: str = "graph", path: str = None):
     if path is None:
         path = os.path.join(os.getcwd(), "anticipator_report.json")
 
@@ -12,16 +12,8 @@ def export_json(log: list = None, name: str = "graph", path: str = None, source:
         os.makedirs(parent, exist_ok=True)
 
     if log is None:
-        if source == "crewai":
-            from anticipator.integrations.crewai.interceptor import get_message_log
-            log = get_message_log()
-        elif source == "langgraph":
-            from anticipator.integrations.langgraph.interceptor import get_message_log
-            log = get_message_log()
-        else:
-            from anticipator.integrations.crewai.interceptor import get_message_log as crewai_log
-            from anticipator.integrations.langgraph.interceptor import get_message_log as langgraph_log
-            log = crewai_log() + langgraph_log()
+        from anticipator.integrations.langgraph.interceptor import get_message_log
+        log = get_message_log()
 
     threats = [r for r in log if r["scan"]["detected"]]
 
@@ -37,7 +29,6 @@ def export_json(log: list = None, name: str = "graph", path: str = None, source:
             "graph": name,
             "generated": datetime.now().isoformat(),
             "version": "0.1.0",
-            "source": source,
         },
         "summary": {
             "total_scanned": len(log),

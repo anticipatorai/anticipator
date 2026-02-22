@@ -9,7 +9,6 @@ class ObservableGraph:
         self._graph = graph
         self._name  = name
         self._patch_done = threading.Event()
-        _print_banner_loading(self._name)
         threading.Thread(target=self._patch_nodes, daemon=True).start()
 
     def _patch_nodes(self):
@@ -27,12 +26,12 @@ class ObservableGraph:
                     if not getattr(spec, "__wrapped_node__", False):
                         nodes[node_name] = wrap_node(node_name, spec, self._name)
                         patched += 1
-        _update_banner(self._name, patched)
+        _print_banner(self._name, patched)
         self._patched = patched > 0
         self._patch_done.set()
 
     def compile(self, **kwargs):
-        self._patch_done.wait()  # ensure patching done before compile
+        self._patch_done.wait()
         compiled = self._graph.compile(**kwargs)
         return _CompiledGraph(compiled, self._name)
 
@@ -85,17 +84,8 @@ def _sev_color(s):
     return {"critical": f"{BG_RED}{WHITE}{BOLD}", "warning": f"{YELLOW}{BOLD}", "none": GREEN}.get(s, RESET)
 
 
-def _print_banner_loading(name):
-    print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR {'─'*30}┐{RESET}")
-    print(f"{CYAN}│{RESET}  Graph : {BOLD}{name}{RESET}")
-    print(f"{CYAN}│{RESET}  Nodes : {DIM}patching...{RESET}")
-    print(f"{CYAN}└{'─'*46}┘{RESET}\n")
-
-
-def _update_banner(name, patched):
+def _print_banner(name, patched):
     ok = f"{GREEN}{patched} node(s) patched{RESET}" if patched else f"{RED}0 nodes patched{RESET}"
-    # Move cursor up 4 lines and redraw
-    print(f"\033[4A\033[J", end="")
     print(f"\n{CYAN}{BOLD}┌─ ANTICIPATOR {'─'*30}┐{RESET}")
     print(f"{CYAN}│{RESET}  Graph : {BOLD}{name}{RESET}")
     print(f"{CYAN}│{RESET}  Nodes : {ok}")

@@ -1,9 +1,8 @@
- # Contributing to Anticipator
+# Contributing to Anticipator
 
 Thanks for your interest in contributing. Here's how to get started.
 
 ## Getting Started
-
 ```bash
 git clone https://github.com/anticipatorai/anticipator
 cd anticipator
@@ -14,6 +13,7 @@ pip install -e ".[dev]"
 
 - **Bug reports** — open an issue with steps to reproduce
 - **New detection phrases** — add to `anticipator/detection/signatures.py`
+- **New detection algorithms** — implement new scoring or pattern-matching logic in `anticipator/detection/`
 - **Framework support** — help add AutoGen or other pipeline support
 - **Tests** — add test cases in `tests/`
 - **Documentation** — improve examples and guides
@@ -29,6 +29,26 @@ pip install -e ".[dev]"
 ## Adding Detection Phrases
 
 The easiest contribution is adding new injection phrases to `DIRECT_PHRASES` in `anticipator/detection/signatures.py`. If you find a prompt injection pattern that Anticipator misses, open a PR with the phrase added.
+
+## Adding Detection Algorithms
+
+If you have an idea for a new detection method — such as semantic similarity scoring, entropy analysis, token pattern matching, or heuristic-based classifiers — you can contribute it to `anticipator/detection/`. Here's how:
+
+1. Create a new file in `anticipator/detection/` (e.g., `my_detector.py`)
+2. Implement a function that accepts a text string and returns a result dict:
+```python
+   def detect(text: str) -> dict:
+       return {
+           "detected": True or False,
+           "severity": "critical" | "warning" | "none",
+           "reason": "short explanation"
+       }
+```
+3. Wire it into `anticipator/detection/scanner.py` so it runs as part of the scan pipeline
+4. Add tests in `tests/` covering both positive and negative cases
+5. Keep it local and deterministic — no external API calls
+
+Good candidates for new algorithms include regex-based structural analysis, instruction boundary detection, role-switching pattern recognition, and payload obfuscation detection.
 
 ## Code Style
 

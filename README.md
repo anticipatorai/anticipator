@@ -2,9 +2,11 @@
 
 **Runtime security for multi-agent AI systems.**
 
-Anticipator detects prompt injection, credential leakage, and anomalous agent behavior across LangGraph and CrewAI pipelines — before they become incidents.
+Anticipator detects prompt injection, credential leakage, and anomalous agent behavior across LangGraph pipelines — before they become incidents.
 
 No LLMs. No embeddings. No external APIs. Fully local, fully deterministic, under 5ms per message.
+
+> ⚡ Caught something in your pipeline? [Open an issue](../../issues) — we want to see real-world detections.
 
 ---
 
@@ -38,21 +40,10 @@ app = secure.compile()
 # Run normally — Anticipator intercepts silently in the background
 result = app.invoke({"input": "..."})
 
-# Export JSON report
+# Optional: export JSON report from Python
 app.export_report()
-```
-
-### CrewAI
-
-```python
-from anticipator import observe
-
-crew = Crew(agents=[researcher, analyst], tasks=[task1, task2])
-secure = observe(crew, name="research_crew")
-result = secure.kickoff()
-
-# Export JSON report
-secure.export_report()
+# Or use the CLI instead:
+# anticipator export
 ```
 
 ### CLI
@@ -119,17 +110,7 @@ Running `app.export_report()` generates a structured JSON file with full scan hi
 
 ## Persistent Monitoring
 
-Every scan is written to a local SQLite database and accumulates across sessions. Query your threat history at any time:
-
-```python
-# All threats in the last 24 hours
-app.query(severity="critical", last="24h")
-
-# All scans for a specific node
-app.query(node="analyst_agent")
-```
-
-Or from the CLI:
+Every scan is written to a local SQLite database and accumulates across sessions. Query your threat history from the CLI at any time:
 
 ```bash
 anticipator monitor --last 7d
@@ -168,7 +149,7 @@ User Input
 | Framework | Status |
 |---|---|
 | LangGraph | ✅ Supported |
-| CrewAI | ✅ Supported |
+| CrewAI | 🔜 Coming soon |
 | AutoGen | 🔜 Coming soon |
 | Custom pipelines | ✅ Via direct `scan()` API |
 

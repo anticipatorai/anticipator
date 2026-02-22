@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "anticipator"
-version = "0.1.9"
+name = "anticipator-ai"
+version = "0.1.0"
 description = "Runtime threat detection for multi-agent AI systems"
 readme = "README.md"
 license = "Apache-2.0"

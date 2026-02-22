@@ -44,7 +44,7 @@ def monitor(graph, last):
 @click.option("--output", default=None, help="Output path for JSON file")
 def export(output):
     """Export JSON threat report."""
-    export_json(source="both", path=output)
+    export_json(path=output)
     click.echo("✅ JSON report generated.")
 
 
