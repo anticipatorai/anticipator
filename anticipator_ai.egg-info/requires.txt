@@ -1,7 +1,0 @@
-click>=8.0
-pyahocorasick>=2.0
-
-[dev]
-pytest
-twine
-build
