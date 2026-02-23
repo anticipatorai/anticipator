@@ -1,25 +1,37 @@
-from .wrapper import ObservableGraph
+"""
+anticipator.integrations.langgraph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+LangGraph integration package.
 
+Drop-in usage::
 
-def observe(graph, name: str = "langgraph") -> ObservableGraph:
-    """
-    Wrap any LangGraph StateGraph with Anticipator threat detection.
+    from anticipator.integrations.langgraph import observe
 
-    Drop-in usage:
-        from integrations.langgraph import observe
+    graph = StateGraph(MyState)
+    # ... add_node / add_edge ...
 
-        graph = StateGraph(...)  # your existing graph
-        graph = graph.compile()
+    secure_graph = observe(graph, name="my-pipeline")
+    app = secure_graph.compile()
 
-        secure_graph = observe(graph)
-        result = secure_graph.invoke({"input": "hello"})
+    result = app.invoke({"input": "hello"})
+    app.report()          # print threat summary to stdout
+    app.monitor()         # print persistent DB summary
+    app.export_report()   # write JSON to ./anticipator_report.json
 
-    Detections run on every node's input automatically:
-        - Prompt injection (Aho-Corasick + encoding + heuristics)
-        - Credential leakage (regex + entropy)
-        - Canary word tampering (if source agent is known)
+What observe() does
+-------------------
+Wraps every non-system node in the StateGraph with a transparent
+interceptor that:
+  - Extracts the text payload from the node state (handles str, dict,
+    LangChain BaseMessage, arbitrary objects)
+  - Runs the full Anticipator detection pipeline (aho-corasick, encoding,
+    entropy, heuristic, homoglyph, path traversal, tool alias, canary,
+    threat categories)
+  - Logs detections to an in-memory list AND a persistent SQLite store
+  - Prints a coloured console alert for critical/high findings
+  - Passes the state through unchanged — smoke-detector mode, never blocks
+"""
 
-    No messages are blocked — smoke detector mode only.
-    Use secure_graph.report() to see a threat summary.
-    """
-    return ObservableGraph(graph, name=name)
+from .wrapper import ObservableGraph, observe
+
+__all__ = ["observe", "ObservableGraph"]

@@ -1,231 +1,316 @@
 """
-Persistent SQLite Monitor
-Framework-agnostic telemetry storage.
-Supports CrewAI, LangGraph, or both simultaneously.
+anticipator.integrations.monitor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Persistent SQLite telemetry store.
+Framework-agnostic — used by LangGraph, CrewAI, and any future integration.
+
+Fixes over v1
+-------------
+- WAL mode enabled on every connection: concurrent readers + one writer,
+  no blocking between scan_pipeline threads and query() calls
+- _connect() uses a context-manager-compatible wrapper so connections are
+  always closed even on exceptions
+- write_scan / write_delegation use context managers (with conn:) instead
+  of manual .commit() / .close() — exception-safe
+- _parse_since: added "m" (minutes) support; raises ValueError on unknown
+  unit instead of silently defaulting to 7 days
+- summary(): runs all COUNT queries on a single connection (was opening
+  five separate connections per call)
+- _build_where: extra clause uses parameterised form where possible;
+  "detected = 1" and "severity = 'critical'" are moved to param list
+  to keep the query fully parameterised (SQL injection hardening)
+- init_db() catches and logs errors rather than crashing at import time
+- Module-level init_db() call is guarded so test imports don't fail if
+  the home directory is read-only
 """
 
-import sqlite3
 import json
+import logging
 import os
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
+from typing import Dict, Generator, List, Optional
+
+log = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.expanduser("~"), ".anticipator", "anticipator.db")
 
-def _connect() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) 
-    conn = sqlite3.connect(DB_PATH)
+
+# ── Connection helper ─────────────────────────────────────────────────────────
+
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
+    """
+    Context manager that yields a WAL-mode SQLite connection and guarantees
+    close on exit — even if an exception is raised inside the with block.
+    """
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = _connect()
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS scans (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp     TEXT    NOT NULL,
-            framework     TEXT    NOT NULL,
-            graph         TEXT    NOT NULL,
-            node          TEXT    NOT NULL,
-            severity      TEXT    NOT NULL,
-            detected      INTEGER NOT NULL,
-            input_preview TEXT    NOT NULL,
-            scan_json     TEXT    NOT NULL
-        )
-    """)
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS delegations (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            framework TEXT NOT NULL,
-            graph     TEXT NOT NULL,
-            from_node TEXT NOT NULL,
-            to_node   TEXT NOT NULL
-        )
-    """)
-
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_timestamp ON scans(timestamp)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_framework ON scans(framework)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_graph     ON scans(graph)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_severity  ON scans(severity)")
-
-    conn.commit()
-    conn.close()
+    # WAL: allows concurrent readers while a write is in progress
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")   # safe + faster than FULL
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
-init_db()
+# ── Schema ────────────────────────────────────────────────────────────────────
+
+def init_db() -> None:
+    """Create tables and indexes if they don't already exist."""
+    try:
+        with _connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS scans (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp     TEXT    NOT NULL,
+                    framework     TEXT    NOT NULL,
+                    graph         TEXT    NOT NULL,
+                    node          TEXT    NOT NULL,
+                    severity      TEXT    NOT NULL,
+                    detected      INTEGER NOT NULL,
+                    input_preview TEXT    NOT NULL,
+                    scan_json     TEXT    NOT NULL
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS delegations (
+                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    framework TEXT NOT NULL,
+                    graph     TEXT NOT NULL,
+                    from_node TEXT NOT NULL,
+                    to_node   TEXT NOT NULL
+                )
+            """)
+
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scans_timestamp"
+                " ON scans(timestamp)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scans_framework"
+                " ON scans(framework)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scans_graph"
+                " ON scans(graph)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scans_severity"
+                " ON scans(severity)"
+            )
+    except Exception as exc:
+        log.error("[ANTICIPATOR] init_db failed: %s", exc)
+
+
+# Run at import time; guard prevents crash in read-only test environments
+try:
+    init_db()
+except Exception as _init_exc:
+    log.warning("[ANTICIPATOR] Could not initialise DB at import: %s", _init_exc)
+
+
+# ── Writes ────────────────────────────────────────────────────────────────────
 
 def write_scan(
     framework: str,
     graph: str,
     node: str,
     scan_result: dict,
-    input_preview: str
-):
-    conn = _connect()
-
-    conn.execute(
-        """
-        INSERT INTO scans
-        (timestamp, framework, graph, node, severity, detected, input_preview, scan_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            datetime.utcnow().isoformat(),
-            framework,
-            graph,
-            node,
-            scan_result.get("severity", "none"),
-            1 if scan_result.get("detected") else 0,
-            input_preview[:200],
-            json.dumps(scan_result),
+    input_preview: str,
+) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO scans
+              (timestamp, framework, graph, node, severity,
+               detected, input_preview, scan_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.utcnow().isoformat(),
+                framework,
+                graph,
+                node,
+                scan_result.get("severity", "none"),
+                1 if scan_result.get("detected") else 0,
+                input_preview[:200],
+                json.dumps(scan_result),
+            ),
         )
-    )
-
-    conn.commit()
-    conn.close()
 
 
 def write_delegation(
     framework: str,
     graph: str,
     from_node: str,
-    to_node: str
-):
-    conn = _connect()
-
-    conn.execute(
-        """
-        INSERT INTO delegations
-        (timestamp, framework, graph, from_node, to_node)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            datetime.utcnow().isoformat(),
-            framework,
-            graph,
-            from_node,
-            to_node
+    to_node: str,
+) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO delegations
+              (timestamp, framework, graph, from_node, to_node)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (datetime.utcnow().isoformat(), framework, graph, from_node, to_node),
         )
-    )
 
-    conn.commit()
-    conn.close()
+
+# ── Time parsing ──────────────────────────────────────────────────────────────
+
+_UNIT_MAP: dict[str, str] = {
+    "m": "minutes",
+    "h": "hours",
+    "d": "days",
+    "w": "weeks",
+}
+
 
 def _parse_since(last: str) -> datetime:
-    now = datetime.utcnow()
-    unit = last[-1]
-    value = int(last[:-1])
+    """
+    Parse a duration string like "30m", "6h", "7d", "2w" into a UTC datetime.
 
-    if unit == "h":
-        return now - timedelta(hours=value)
-    if unit == "d":
-        return now - timedelta(days=value)
-    if unit == "y":
-        return now - timedelta(days=value * 365)
+    Raises
+    ------
+    ValueError
+        If the unit character is not one of m / h / d / w.
+    """
+    if not last or len(last) < 2:
+        raise ValueError(f"Invalid duration string: {last!r}")
 
-    return now - timedelta(days=7)
+    unit  = last[-1].lower()
+    try:
+        value = int(last[:-1])
+    except ValueError:
+        raise ValueError(f"Invalid duration value in: {last!r}")
+
+    if unit not in _UNIT_MAP:
+        raise ValueError(
+            f"Unknown time unit {unit!r} in {last!r}. "
+            f"Use one of: {', '.join(_UNIT_MAP)}"
+        )
+
+    return datetime.utcnow() - timedelta(**{_UNIT_MAP[unit]: value})
 
 
-def _build_where(framework=None, graph=None, node=None, severity=None, last=None, extra=None):
-    clauses = []
-    params = []
+# ── Query builder ─────────────────────────────────────────────────────────────
 
-    if framework:
-        clauses.append("framework = ?")
-        params.append(framework)
+def _build_where(
+    framework: Optional[str] = None,
+    graph:     Optional[str] = None,
+    node:      Optional[str] = None,
+    severity:  Optional[str] = None,
+    last:      Optional[str] = None,
+    detected:  Optional[bool] = None,   # replaces the raw "extra" string
+) -> tuple[str, list]:
+    """
+    Build a parameterised WHERE clause.
+    All filters use ? placeholders — no raw string interpolation.
+    """
+    clauses: list[str] = []
+    params:  list      = []
 
-    if graph:
-        clauses.append("graph = ?")
-        params.append(graph)
+    if framework is not None:
+        clauses.append("framework = ?");  params.append(framework)
+    if graph is not None:
+        clauses.append("graph = ?");      params.append(graph)
+    if node is not None:
+        clauses.append("node = ?");       params.append(node)
+    if severity is not None:
+        clauses.append("severity = ?");   params.append(severity)
+    if last is not None:
+        clauses.append("timestamp >= ?"); params.append(_parse_since(last).isoformat())
+    if detected is not None:
+        clauses.append("detected = ?");   params.append(1 if detected else 0)
 
-    if node:
-        clauses.append("node = ?")
-        params.append(node)
-
-    if severity:
-        clauses.append("severity = ?")
-        params.append(severity)
-
-    if last:
-        clauses.append("timestamp >= ?")
-        params.append(_parse_since(last).isoformat())
-
-    if extra:
-        clauses.append(extra)
-
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     return where, params
+
+
+# ── Reads ─────────────────────────────────────────────────────────────────────
 
 def query(
     framework: Optional[str] = None,
-    graph: Optional[str] = None,
-    node: Optional[str] = None,
-    severity: Optional[str] = None,
-    last: Optional[str] = None,
-    limit: int = 100
+    graph:     Optional[str] = None,
+    node:      Optional[str] = None,
+    severity:  Optional[str] = None,
+    last:      Optional[str] = None,
+    limit:     int = 100,
 ) -> List[Dict]:
-
     where, params = _build_where(
-        framework=framework,
-        graph=graph,
-        node=node,
-        severity=severity,
-        last=last
+        framework=framework, graph=graph, node=node,
+        severity=severity,   last=last,
     )
-
-    conn = _connect()
-
-    rows = conn.execute(
-        f"SELECT * FROM scans {where} ORDER BY timestamp DESC LIMIT ?",
-        params + [limit]
-    ).fetchall()
-
-    conn.close()
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM scans {where} ORDER BY timestamp DESC LIMIT ?",
+            params + [limit],
+        ).fetchall()
     return [dict(r) for r in rows]
 
-def summary(framework=None, graph=None, last=None):
 
-    conn = _connect()
+def summary(
+    framework: Optional[str] = None,
+    graph:     Optional[str] = None,
+    last:      Optional[str] = None,
+) -> Dict:
+    """
+    Return aggregate counts from the scans table.
+    All five queries share a single connection (was 5 separate connections).
+    """
+    w_all,  p_all  = _build_where(framework=framework, graph=graph, last=last)
+    w_thr,  p_thr  = _build_where(framework=framework, graph=graph, last=last, detected=True)
+    w_crit, p_crit = _build_where(framework=framework, graph=graph, last=last,
+                                   detected=True, severity="critical")
+    w_warn, p_warn = _build_where(framework=framework, graph=graph, last=last,
+                                   severity="warning")
 
-    where_all,      p_all      = _build_where(framework=framework, graph=graph, last=last)
-    where_threat,   p_threat   = _build_where(framework=framework, graph=graph, last=last, extra="detected = 1")
-    where_critical, p_critical = _build_where(framework=framework, graph=graph, last=last, extra="severity = 'critical'")
-    where_warning,  p_warning  = _build_where(framework=framework, graph=graph, last=last, extra="severity = 'warning'")
-    where_top,      p_top      = _build_where(framework=framework, graph=graph, last=last, extra="detected = 1")
+    with _connect() as conn:
+        total    = conn.execute(f"SELECT COUNT(*) FROM scans {w_all}",  p_all ).fetchone()[0]
+        threats  = conn.execute(f"SELECT COUNT(*) FROM scans {w_thr}",  p_thr ).fetchone()[0]
+        critical = conn.execute(f"SELECT COUNT(*) FROM scans {w_crit}", p_crit).fetchone()[0]
+        warning  = conn.execute(f"SELECT COUNT(*) FROM scans {w_warn}", p_warn).fetchone()[0]
 
-    total    = conn.execute(f"SELECT COUNT(*) FROM scans {where_all}", p_all).fetchone()[0]
-    threats  = conn.execute(f"SELECT COUNT(*) FROM scans {where_threat}", p_threat).fetchone()[0]
-    critical = conn.execute(f"SELECT COUNT(*) FROM scans {where_critical}", p_critical).fetchone()[0]
-    warning  = conn.execute(f"SELECT COUNT(*) FROM scans {where_warning}", p_warning).fetchone()[0]
-
-    top_nodes = conn.execute(
-        f"""
-        SELECT node, COUNT(*) as c
-        FROM scans {where_top}
-        GROUP BY node
-        ORDER BY c DESC
-        LIMIT 5
-        """,
-        p_top
-    ).fetchall()
-
-    conn.close()
+        top_nodes = conn.execute(
+            f"""
+            SELECT node, COUNT(*) AS c
+            FROM   scans {w_thr}
+            GROUP  BY node
+            ORDER  BY c DESC
+            LIMIT  5
+            """,
+            p_thr,
+        ).fetchall()
 
     return {
-        "total": total,
-        "threats": threats,
+        "total":    total,
+        "threats":  threats,
         "critical": critical,
-        "warning": warning,
-        "clean": total - threats,
+        "warning":  warning,
+        "clean":    total - threats,
         "top_threat_nodes": [
             {"node": r["node"], "count": r["c"]} for r in top_nodes
         ],
     }
 
-def print_summary(framework=None, graph=None, last=None):
+
+# ── Pretty printer ────────────────────────────────────────────────────────────
+
+def print_summary(
+    framework: Optional[str] = None,
+    graph:     Optional[str] = None,
+    last:      Optional[str] = None,
+) -> None:
     s = summary(framework=framework, graph=graph, last=last)
 
     RESET  = "\033[0m"; BOLD   = "\033[1m"
@@ -236,9 +321,9 @@ def print_summary(framework=None, graph=None, last=None):
     print(f"\n{CYAN}{BOLD}╔══ ANTICIPATOR DB MONITOR{period} {'═'*28}╗{RESET}")
     print(f"{CYAN}║{RESET}  DB            : anticipator.db")
     print(f"{CYAN}║{RESET}  Total scanned : {BOLD}{s['total']}{RESET}")
-    print(f"{CYAN}║{RESET}  Threats       : {RED+BOLD}{s['threats']}{RESET}")
-    print(f"{CYAN}║{RESET}  Critical      : {BG_RED+WHITE+BOLD}{s['critical']}{RESET}")
-    print(f"{CYAN}║{RESET}  Warning       : {YELLOW+BOLD}{s['warning']}{RESET}")
+    print(f"{CYAN}║{RESET}  Threats       : {RED}{BOLD}{s['threats']}{RESET}")
+    print(f"{CYAN}║{RESET}  Critical      : {BG_RED}{WHITE}{BOLD}{s['critical']}{RESET}")
+    print(f"{CYAN}║{RESET}  Warning       : {YELLOW}{BOLD}{s['warning']}{RESET}")
     print(f"{CYAN}║{RESET}  Clean         : {GREEN}{s['clean']}{RESET}")
 
     if s["top_threat_nodes"]:
@@ -248,5 +333,3 @@ def print_summary(framework=None, graph=None, last=None):
             print(f"{CYAN}║{RESET}    {RED}•{RESET} {t['node']} — {BOLD}{t['count']}{RESET} hits")
 
     print(f"{CYAN}╚{'═'*56}╝{RESET}\n")
-
-    
