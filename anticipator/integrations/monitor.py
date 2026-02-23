@@ -1,29 +1,3 @@
-"""
-anticipator.integrations.monitor
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Persistent SQLite telemetry store.
-Framework-agnostic — used by LangGraph, CrewAI, and any future integration.
-
-Fixes over v1
--------------
-- WAL mode enabled on every connection: concurrent readers + one writer,
-  no blocking between scan_pipeline threads and query() calls
-- _connect() uses a context-manager-compatible wrapper so connections are
-  always closed even on exceptions
-- write_scan / write_delegation use context managers (with conn:) instead
-  of manual .commit() / .close() — exception-safe
-- _parse_since: added "m" (minutes) support; raises ValueError on unknown
-  unit instead of silently defaulting to 7 days
-- summary(): runs all COUNT queries on a single connection (was opening
-  five separate connections per call)
-- _build_where: extra clause uses parameterised form where possible;
-  "detected = 1" and "severity = 'critical'" are moved to param list
-  to keep the query fully parameterised (SQL injection hardening)
-- init_db() catches and logs errors rather than crashing at import time
-- Module-level init_db() call is guarded so test imports don't fail if
-  the home directory is read-only
-"""
-
 import json
 import logging
 import os
@@ -37,18 +11,14 @@ log = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.expanduser("~"), ".anticipator", "anticipator.db")
 
 
-# ── Connection helper ─────────────────────────────────────────────────────────
 
 @contextmanager
 def _connect() -> Generator[sqlite3.Connection, None, None]:
-    """
-    Context manager that yields a WAL-mode SQLite connection and guarantees
-    close on exit — even if an exception is raised inside the with block.
-    """
+
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    # WAL: allows concurrent readers while a write is in progress
+
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")   # safe + faster than FULL
     try:
@@ -60,8 +30,6 @@ def _connect() -> Generator[sqlite3.Connection, None, None]:
     finally:
         conn.close()
 
-
-# ── Schema ────────────────────────────────────────────────────────────────────
 
 def init_db() -> None:
     """Create tables and indexes if they don't already exist."""
@@ -112,14 +80,11 @@ def init_db() -> None:
         log.error("[ANTICIPATOR] init_db failed: %s", exc)
 
 
-# Run at import time; guard prevents crash in read-only test environments
 try:
     init_db()
 except Exception as _init_exc:
     log.warning("[ANTICIPATOR] Could not initialise DB at import: %s", _init_exc)
 
-
-# ── Writes ────────────────────────────────────────────────────────────────────
 
 def write_scan(
     framework: str,
@@ -166,8 +131,6 @@ def write_delegation(
         )
 
 
-# ── Time parsing ──────────────────────────────────────────────────────────────
-
 _UNIT_MAP: dict[str, str] = {
     "m": "minutes",
     "h": "hours",
@@ -177,14 +140,7 @@ _UNIT_MAP: dict[str, str] = {
 
 
 def _parse_since(last: str) -> datetime:
-    """
-    Parse a duration string like "30m", "6h", "7d", "2w" into a UTC datetime.
 
-    Raises
-    ------
-    ValueError
-        If the unit character is not one of m / h / d / w.
-    """
     if not last or len(last) < 2:
         raise ValueError(f"Invalid duration string: {last!r}")
 
@@ -203,20 +159,15 @@ def _parse_since(last: str) -> datetime:
     return datetime.utcnow() - timedelta(**{_UNIT_MAP[unit]: value})
 
 
-# ── Query builder ─────────────────────────────────────────────────────────────
-
 def _build_where(
     framework: Optional[str] = None,
     graph:     Optional[str] = None,
     node:      Optional[str] = None,
     severity:  Optional[str] = None,
     last:      Optional[str] = None,
-    detected:  Optional[bool] = None,   # replaces the raw "extra" string
+    detected:  Optional[bool] = None,   
 ) -> tuple[str, list]:
-    """
-    Build a parameterised WHERE clause.
-    All filters use ? placeholders — no raw string interpolation.
-    """
+
     clauses: list[str] = []
     params:  list      = []
 
@@ -236,8 +187,6 @@ def _build_where(
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     return where, params
 
-
-# ── Reads ─────────────────────────────────────────────────────────────────────
 
 def query(
     framework: Optional[str] = None,
@@ -264,10 +213,6 @@ def summary(
     graph:     Optional[str] = None,
     last:      Optional[str] = None,
 ) -> Dict:
-    """
-    Return aggregate counts from the scans table.
-    All five queries share a single connection (was 5 separate connections).
-    """
     w_all,  p_all  = _build_where(framework=framework, graph=graph, last=last)
     w_thr,  p_thr  = _build_where(framework=framework, graph=graph, last=last, detected=True)
     w_crit, p_crit = _build_where(framework=framework, graph=graph, last=last,
@@ -303,8 +248,6 @@ def summary(
         ],
     }
 
-
-# ── Pretty printer ────────────────────────────────────────────────────────────
 
 def print_summary(
     framework: Optional[str] = None,

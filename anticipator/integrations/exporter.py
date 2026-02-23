@@ -1,22 +1,3 @@
-"""
-anticipator.integrations.exporter
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-One-shot JSON report writer for scan logs.
-
-Fixes over v1
--------------
-- Threat grouping key uses SHA-256 of the full input_preview instead of
-  the first 300 chars — two messages with a long shared preamble but
-  different payloads no longer collapse into one report entry
-- export_json accepts an explicit *log* list OR fetches from interceptor
-  if none supplied (unchanged behaviour, just made the default explicit)
-- Path handling uses pathlib for cross-platform safety
-- Report version bumped to 0.2.0
-- Added per-threat layer breakdown to the threats section so the report
-  is self-contained (no need to cross-reference scan_json)
-- full_log entries include severity breakdown from scan layers
-"""
-
 import hashlib
 import json
 import os
@@ -30,24 +11,7 @@ def export_json(
     name: str = "graph",
     path: Optional[str] = None,
 ) -> str:
-    """
-    Write a structured JSON threat report to *path*.
 
-    Parameters
-    ----------
-    log:
-        List of scan-log entries (from interceptor.get_message_log()).
-        If None, fetched automatically from the LangGraph interceptor.
-    name:
-        Graph / pipeline name embedded in the report metadata.
-    path:
-        Destination file path. Defaults to ./anticipator_report.json.
-
-    Returns
-    -------
-    str
-        Absolute path of the written report file.
-    """
     if log is None:
         from anticipator.integrations.langgraph.interceptor import get_message_log
         log = get_message_log()
@@ -55,12 +19,9 @@ def export_json(
     if path is None:
         path = os.path.join(os.getcwd(), "anticipator_report.json")
 
-    # Ensure parent directory exists
     dest = Path(path).resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    # ── Threat grouping ──────────────────────────────────────────────────────
-    # Key: SHA-256 of the full input_preview — prevents preamble collisions
     threats_raw = [r for r in log if r["scan"]["detected"]]
     grouped: dict = {}
 
@@ -83,7 +44,6 @@ def export_json(
             }
         grouped[key]["nodes"].append(t["node"])
 
-    # ── Report structure ─────────────────────────────────────────────────────
     report = {
         "meta": {
             "graph":     name,
@@ -111,7 +71,7 @@ def export_json(
                 "detected":      r["scan"]["detected"],
                 "severity":      r["scan"]["severity"],
                 "input_preview": r["input_preview"][:200],
-                # Which layers fired (empty list when clean)
+
                 "layers_hit": [
                     layer
                     for layer, result in r["scan"].get("layers", {}).items()
