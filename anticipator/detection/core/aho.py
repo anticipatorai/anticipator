@@ -58,13 +58,9 @@ from anticipator.detection.signatures import (
     VERBS,
 )
 
-# ── Tuning ────────────────────────────────────────────────────────────────────
 
-# Characters either side of a VERB hit to search for an OBJECT
 _WINDOW = 80
 
-
-# ── Automaton builder (tiny, instant) ────────────────────────────────────────
 
 def _build(words: list[str]) -> ahocorasick.Automaton:
     """Build an Aho-Corasick automaton from a flat word/phrase list."""
@@ -79,8 +75,6 @@ def _build(words: list[str]) -> ahocorasick.Automaton:
     return A
 
 
-# ── Three tiny automatons — all build in <100ms total ────────────────────────
-
 print("[ANTICIPATOR] Loading detection engine...", flush=True)
 
 _DIRECT_AC = _build(DIRECT_PHRASES)           # ~300 phrases  exact match
@@ -89,10 +83,6 @@ _OBJECT_AC = _build(OBJECTS)                  # ~60  words    proximity target
 
 print("[ANTICIPATOR] Detection engine ready.", flush=True)
 
-
-# ── Structural regex patterns (compiled once) ─────────────────────────────────
-# Catches role-switch, encoding, authority, and jailbreak structures that
-# don't reduce well to verb+object token pairs.
 
 _STRUCTURAL: list[tuple[re.Pattern, str]] = [
     # Role / persona switch
@@ -117,8 +107,6 @@ _STRUCTURAL: list[tuple[re.Pattern, str]] = [
 ]
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
-
 def detect(text: str) -> dict:
     """
     Scan *text* for injection signals across three passes.
@@ -134,7 +122,6 @@ def detect(text: str) -> dict:
     normalized = normalize(text)
     matches: list[dict[str, Any]] = []
 
-    # ── Pass 1: exact DIRECT_PHRASES hits ─────────────────────────────────────
     for end, (_, pattern) in _DIRECT_AC.iter(normalized):
         start = end - len(pattern) + 1
         matches.append({
@@ -143,11 +130,9 @@ def detect(text: str) -> dict:
             "span":    (start, end),
         })
 
-    # ── Pass 2: VERB + OBJECT proximity ───────────────────────────────────────
     for verb_end, (_, verb) in _VERB_AC.iter(normalized):
         verb_start = verb_end - len(verb) + 1
 
-        # Context window around the verb
         win_lo = max(0, verb_start - _WINDOW)
         win_hi = min(len(normalized), verb_end + _WINDOW)
         window = normalized[win_lo:win_hi]
@@ -159,9 +144,8 @@ def detect(text: str) -> dict:
                 "object": obj,
                 "span":   (verb_start, verb_end),
             })
-            break   # one object per verb is enough — avoid duplicate floods
+            break   
 
-    # ── Pass 3: structural regex ───────────────────────────────────────────────
     for pattern, label in _STRUCTURAL:
         m = pattern.search(normalized)
         if m:

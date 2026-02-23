@@ -9,6 +9,25 @@ description = "Runtime threat detection for multi-agent AI systems"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
+authors = [
+    { name = "Mohith Karthikeya M" },
+    { name = "Rishikesh T R" }
+]
+keywords = [
+    "security", "ai", "agents", "langgraph", "prompt-injection",
+    "llm", "multi-agent", "threat-detection", "runtime-security"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "click>=8.0",
     "pyahocorasick>=2.0",
@@ -16,6 +35,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "twine", "build"]
+
+[project.urls]
+Homepage = "https://github.com/YOUR_ORG/anticipator"
+Repository = "https://github.com/YOUR_ORG/anticipator"
+Issues = "https://github.com/YOUR_ORG/anticipator/issues"
 
 [project.scripts]
 anticipator = "anticipator.cli:main"
